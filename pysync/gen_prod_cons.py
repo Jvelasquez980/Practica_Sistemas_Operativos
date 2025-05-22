@@ -1,36 +1,34 @@
-import threading
-import logging
+from threading import Semaphore as Semaphore
 
 class GenProdCons:
-    def __init__(self, size):
-        assert size > 0, "Buffer size must be greater than 0"
+    def __init__(self, size=10):
         self.size = size
-        self.buffer = [0] * size
-        self.entry = 0
-        self.outlet = 0
-        self.quantity = 0
+        self.buffer = [None] * size
+        self.mutex = Semaphore(1)
+        self.full = Semaphore(0)
+        self.empty = Semaphore(size)
+        self.in_index = 0
+        self.out_index = 0
+        self.count = 0
 
-        self.mutex = threading.Semaphore(1)
-        self.empty = threading.Semaphore(size)
-        self.full = threading.Semaphore(0)
-
-    def produce(self, item):
+    def put(self, item):
         self.empty.acquire()
         self.mutex.acquire()
-        self.buffer[self.entry] = item
-        self.entry = (self.entry + 1) % self.size
-        self.quantity += 1
-        logging.info("Produced item: %s", item)
+        self.buffer[self.in_index] = item
+        self.in_index = (self.in_index + 1) % self.size
+        self.count += 1
         self.mutex.release()
         self.full.release()
 
-    def consume(self):
+    def get(self):
         self.full.acquire()
         self.mutex.acquire()
-        item = self.buffer[self.outlet]
-        self.outlet = (self.outlet + 1) % self.size
-        self.quantity -= 1
+        item = self.buffer[self.out_index]
+        self.out_index = (self.out_index + 1) % self.size
+        self.count -= 1
         self.mutex.release()
         self.empty.release()
-        logging.info("Consumed item: %s", item)
         return item
+
+    def __len__(self):
+        return self.count
